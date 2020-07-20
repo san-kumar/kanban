@@ -2,7 +2,7 @@
 
 Kanban folders allows you to create a kanban board per folder.
 
-It creates a .kanban file inside your folder, so you can have a separate kanban board / folder.   
+It creates a .kanban file inside your folder, so you can have a separate kanban board for every folder (or project).   
 
 ## Screenshot
 
@@ -23,7 +23,7 @@ It creates a .kanban file inside your folder, so you can have a separate kanban 
 Q. Why should I use this very limited kanban board when i can use something like Trello that has 100 more features?
 
 A. The same reason you want to run a local to-do program instead of todoist. 
-It runs locally and you can create a new kanban board inside each directory to track progress of the work / tests / files in that directory only.
+It runs locally, and you can create a new kanban board inside each directory to track progress of the work in that folder (like tests or scripts in that directory only).
   
 
 ## Requirements
@@ -48,7 +48,7 @@ kanban
 
 ## Running
 
-Just run `kanban` in any directory in which you want to create a new todo list. It should open up your web browser and you should see your todo list!
+Just run `kanban` in any directory in which you want to create a new kanban list. It should open up your web browser and you should see your kanban list!
 
 The program basically creates/reads a `.kanban` file (JSON) using the PHP and opens the editor in your favorite web browser.
 
