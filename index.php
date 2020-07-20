@@ -7,8 +7,7 @@ $kanban = "$dir/.kanban";
 if ($tasks = $_REQUEST['tasks'] ?? '')
     exit(file_put_contents($kanban, json_encode(['tasks' => json_decode($tasks)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)));
 
-if (!file_exists($kanban))
-    file_put_contents($kanban, '{"tasks": []}');
+if (!file_exists($kanban)) file_put_contents($kanban, '{"tasks": []}');
 
 $tasks = json_decode(file_get_contents($kanban), TRUE);
 ?>
@@ -18,75 +17,91 @@ $tasks = json_decode(file_get_contents($kanban), TRUE);
         <div v-for="type in types" class="col-sm-4" :style="{opacity: type === 'completed' ? 0.65 : 1}" :key="type">
             <div><input type="search" v-model.trim="search[type]" :placeholder="type + ' &#128269;'" style="font-size: 24px; border: 0;" class="heading"></div>
 
-            <draggable v-model="filtered[type]" group="tasks" @change="rearrange" class="panel bg-light p-2">
-                <div v-for="(task, index) in filtered[type]" :key="task.id" :class="!search[type] || task.text.indexOf(search[type]) !== -1 ? 'd-flex' : 'd-none'" class="flex-row align-items-center" :title="timeSince(task)">
-                    <input type="checkbox" class="mr-2" v-model="task.type" :true-value="type === 'pending' ? 'processing' : 'completed'" :false-value="type === 'completed' ? 'pending' : type"/>
-                    <div v-if="task.edit"><input type="text" v-model.lazy.trim="task.text" class="border-0  form-control form-control-sm" @keyup="e => keypress(task, e)" @blur="$delete(task, 'edit')" :ref="'edit'+task.id"></div>
-                    <a v-else href="#" @click.prevent="$set(task, 'edit', true)">{{task.text}}</a>
-                </div>
-            </draggable>
+            <tasks :type="type" :tasks="tasks" @change="rearrange" class="panel" group="tasks" :root="true" :search="search[type]"></tasks>
 
             <hr/>
 
             <form @submit.prevent="addTask(type)" class="d-flex flex-row align-items-center">
-                <input type="text" v-model="task" class="form-control mr-2" :placeholder="`${type} task..`" aria-describedby="new task">
+                <input type="text" v-model="task" class="form-control mr-2" :placeholder="`Add ${type} task..`" aria-describedby="new task">
                 <button class="btn btn-primary" type="submit">Add</button>
             </form>
         </div>
     </div>
-    <!--<pre class="debug pre-scrollable">tasks: {{tasks}}</pre>-->
 </div>
 
 <script>
-    new Vue({
-        el: '#app',
-        data() {
-            return {search: {}, tasks: <?=json_encode($tasks['tasks'] ?: []) ?>, task: '', filtered: null}
-        },
+    let newTask = (text, type) => ({text, priority: "medium", creation: +Math.floor(+(new Date()) / 1000), id: 'task' + Math.floor(Math.random() * 99999999999), tasks: [], type});
+
+    Vue.component('tasks', {
+        name: 'tasks',
+        template: `
+        <template>
+            <draggable :list="tasks" :group="{name: 'tasks', pull:move, put:move}" @change="e => root ? $emit('change', {e, type}) : ''" class="bg-light pl-1">
+                <div v-for="(task, index) in tasks" :key="task.id" v-show="!root || (task.type === type) && (!search || task.text.indexOf(search) !== -1)" class="position-relative task" :title="timeSince(task)">
+                    <div class="d-flex flex-row align-items-center list-item">
+                        <a href="#" class="mr-2 text-muted" :style="{opacity: task.tasks.length ? 1: 0}" @click="$set(task, 'collapsed', !task.collapsed)">{{task.collapsed ? '&#9657;' : '&#9663;'}}</a>
+                        <input type="checkbox" class="mr-2" v-model="task.type" :true-value="type === 'todo' ? 'doing' : 'done'" :false-value="type === 'done' ? 'todo' : type"/>
+                        <div class="flex-grow-1">
+                            <div v-if="task.edit"><input type="text" v-model.lazy.trim="task.text" class="border-0  form-control form-control-sm" @keyup="e => keypress(task, e)" @blur="save(task, index)" :id="task.id+type"></div>
+                            <div v-else><a href="#" @click.prevent="edit(task)">{{task.text}}</a></div>
+                        </div>
+                        <div class="actions pr-1"><a href="#" @click.prevent="add(task.tasks)">+</a> <small class=text-warning>/</small> <a href="#" @click.prevent="tasks.splice(index, 1)">&times;</a></div>
+                    </div>
+                    <div v-if="task.tasks && task.tasks instanceof Array" class="pl-3"><tasks :tasks="task.tasks" v-show="!task.collapsed" :type="type"></tasks></div>
+                </div>
+            </draggable>
+        </template>
+        `,
+        props: ['tasks', 'type', 'search', 'root'],
         methods: {
-            now() {
-                return Math.floor(+(new Date()) / 1000);
-            },
-            addTask(type) {
-                if (this.task !== '')
-                    this.tasks.push({"text": this.task, priority: "medium", creation: this.now(), id: 'task' + Math.floor(Math.random() * 99999999999), type});
-
-                this.task = '';
-            },
-            timeSince(task) {
-                return timeago.format(task.creation * 1000);
-            },
-            rearrange() {
-                let tasks = [];
-                for (let type of this.types)
-                    for (let task of this.filtered[type])
-                        tasks.push(Object.assign(task, {type}));
-
-                this.tasks = tasks;
-            },
             keypress(task, e) {
                 if (/^(Escape|Enter)$/.test(e.key))
                     this.$delete(task, 'edit');
             },
-            categories() {
-                return {pending: [], processing: [], completed: []};
+            add(tasks) {
+                let task = newTask('new task', this.type);
+                tasks.push(task);
+                this.edit(task);
+            },
+            edit(task) {
+                this.$set(task, 'edit', true);
+                setTimeout(() => document.getElementById(task.id + this.type).focus(), 250);
+            },
+            save(task, i) {
+                if (!task.text) this.tasks.splice(i, 1)
+                else this.$delete(task, 'edit');
+            },
+            move(from, to) {
+                return !!this.root || (from.el === to.el || from.el.contains(to.el) || to.el.contains(from.el));
+            },
+            timeSince(task) {
+                return timeago.format(task.creation * 1000);
             }
+        }
+    });
+
+    new Vue({
+        el: '#app',
+        data() {
+            return {search: {}, tasks: <?=json_encode($tasks['tasks'] ?: []) ?>, task: ''}
+        },
+        methods: {
+            addTask(type) {
+                if (this.task !== '')
+                    this.tasks.push(newTask(this.task, type));
+
+                this.task = '';
+            },
+            rearrange(ev) {
+                if (ev.e.added && ev.type)
+                    this.$set(ev.e.added.element, 'type', ev.type);
+            },
         },
         watch: {
             tasks: {
                 deep: true,
                 immediate: true,
                 handler(tasks) {
-                    this.filtered = this.categories();
-
-                    for (let i = tasks.length - 1; i >= 0; i--) {
-                        let task = tasks[i];
-                        if (task.text) {
-                            if (task.edit === true) setTimeout(() => this.$refs['edit' + task.id][0] ? this.$refs['edit' + task.id][0].focus() : '', 250);
-                            this.filtered[task.type].unshift(task);
-                        } else tasks.splice(i, 1);
-                    }
-
                     clearTimeout(this.timeout);
                     this.timeout = setTimeout(() => fetch('', {method: "POST", body: new URLSearchParams("tasks=" + JSON.stringify(tasks))}), 250);
                 },
@@ -94,7 +109,7 @@ $tasks = json_decode(file_get_contents($kanban), TRUE);
         },
         computed: {
             types() {
-                return Object.keys(this.categories());
+                return ['todo', 'doing', 'done'];
             },
         }
     });

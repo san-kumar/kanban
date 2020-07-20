@@ -42,6 +42,18 @@ register_shutdown_function(function () {
                 height: calc(100vh - 170px);
                 overflow: auto;
             }
+
+            .task .actions {
+                display: none;
+            }
+
+            .task .list-item:hover {
+                background: #ffffcd;
+            }
+
+            .task .list-item:hover .actions {
+                display: block;
+            }
         </style>
     </head>
 
@@ -50,8 +62,8 @@ register_shutdown_function(function () {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/css/bootstrap.min.css" />
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.11/vue.min.js" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/sortablejs@1.4.2"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/Vue.Draggable/2.20.0/vuedraggable.umd.min.js"></script>
+    <script src="http://SortableJS.github.io/Sortable/Sortable.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Vue.Draggable/2.24.0/vuedraggable.umd.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/timeago.js/4.0.2/timeago.min.js"></script>
 
     <?= $body ?>
