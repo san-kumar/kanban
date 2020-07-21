@@ -39,20 +39,28 @@ register_shutdown_function(function () {
 
             .panel {
                 margin-top: 15px;
-                height: calc(100vh - 170px);
+                height: calc(100vh - 175px);
                 overflow: auto;
             }
 
-            .task .actions {
+            .task .actions a:after {
+                content: " / ";
+                color: silver;
+            }
+
+            .task .actions a {
                 display: none;
+                margin: 0 4px;
+                font-size: 16px;
+                text-decoration: none;
             }
 
             .task .list-item:hover {
                 background: #ffffcd;
             }
 
-            .task .list-item:hover .actions {
-                display: block;
+            .task .list-item:hover .actions a {
+                display: inline-block;
             }
         </style>
     </head>
