@@ -6,7 +6,7 @@ It creates a .kanban file inside your folder, so you can have a separate kanban 
 
 ## Screenshot
 
-![Screenshot](./screenshot.gif)
+![Screenshot](./screenshot1.gif)
 
 ## Benefits
 
