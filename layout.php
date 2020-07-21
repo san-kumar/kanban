@@ -43,9 +43,9 @@ register_shutdown_function(function () {
                 overflow: auto;
             }
 
-            .task .actions a:after {
-                content: " / ";
-                color: silver;
+            .task .actions {
+                text-wrap: none;
+                white-space: nowrap;
             }
 
             .task .actions a {
