@@ -2,7 +2,7 @@
 
 SELF=(`realpath $0`)
 SELF_DIR=(`dirname $SELF`)
-pkill -f 'todo2-web-server'
+pkill -f 'kanban-web-server'
 xdg-open http://localhost:9899 > /dev/null 2>&1 &
 echo "Starting PHP server in $SELF_DIR. Press Ctrl+C to stop."
-WORK_DIR=`pwd` php -d variables_order=EGPCS -d todo2-web-server=true -S localhost:9899 $SELF_DIR/index.php > /dev/null 2>&1
+WORK_DIR=`pwd` php -d variables_order=EGPCS -d kanban-web-server=true -S localhost:9899 $SELF_DIR/index.php > /dev/null 2>&1

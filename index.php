@@ -2,7 +2,7 @@
 require_once __DIR__ . '/layout.php';
 global $title;
 $dir = $_ENV['WORK_DIR'];
-$title = ucfirst(basename($dir));
+$title = ucfirst(basename($dir)) ?: 'Main';
 $kanban = "$dir/.kanban";
 
 if ($boards = $_REQUEST['boards'] ?? '')
@@ -178,7 +178,7 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
         },
         computed: {
             activeBoard() {
-                if (!this.boards || !this.boards.length) this.addBoard('Main');
+                if (!this.boards || !this.boards.length) this.addBoard('<?=$title?>');
                 if (!this.activeBoardId) this.activeBoardId = this.boards[0].id;
 
                 for (let board of this.boards) {
