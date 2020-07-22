@@ -1,37 +1,66 @@
 <?php
 require_once __DIR__ . '/layout.php';
 global $title;
-$title = $dir = $_ENV['WORK_DIR'];
+$dir = $_ENV['WORK_DIR'];
+$title = ucfirst(basename($dir));
 $kanban = "$dir/.kanban";
 
-if ($tasks = $_REQUEST['tasks'] ?? '')
-    exit(file_put_contents($kanban, json_encode(['tasks' => json_decode($tasks)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)));
+if ($boards = $_REQUEST['boards'] ?? '')
+    exit(file_put_contents($kanban, json_encode(['boards' => json_decode($boards)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)));
 
-if (!file_exists($kanban)) file_put_contents($kanban, '{"tasks": []}');
+if (!file_exists($kanban)) file_put_contents($kanban, '{"boards": []}');
 
-$tasks = json_decode(file_get_contents($kanban), TRUE);
+$boards = json_decode(file_get_contents($kanban), TRUE);
 ?>
 
-<div id="app" class="container py-3">
-    <div class="row">
-        <div v-for="type in types" class="col-sm-4" :style="{opacity: type === 'completed' ? 0.65 : 1}" :key="type">
-            <div><input type="search" v-model.trim="search[type]" :placeholder="type + ' &#128269;'" style="font-size: 24px; border: 0;" class="heading"></div>
+<div id="app">
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Simple Kanban</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarCollapse">
+                <ul class="navbar-nav ml-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown">{{activeBoard.name}}</a>
+                        <div class="dropdown-menu dropdown-menu-sm-right" aria-labelledby="navbarDropdown">
+                            <a class="dropdown-item disabled">Your kanban boards</a>
+                            <a class="dropdown-item" href="#" v-for="(board, i) in boards" :key="board.id" @click.prevent="activeBoardId = board.id" style="min-width: 300px;">
+                                <div class="d-flex flex-row align-items-center justify-content-between">
+                                    <span><i class="fa fa-fw" :class="{'fa-check': board.id === activeBoard.id}"></i> {{board.name}}</span>
+                                    <button class="btn btn-danger btn-sm" type="button" @click.prevent.stop="removeBoard(i)"><i class="fa fa-trash-o"></i></button>
+                                </div>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item font-weight-bold text-success" href="#" @click.prevent="createBoard()"><i class="fa fa-plus-circle"></i> Create new kanban board</a>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container pt-3">
+        <div class="row">
+            <div v-for="type in types" class="col-sm-4" :style="{opacity: type === 'completed' ? 0.65 : 1}" :key="type">
+                <div><input type="search" v-model.trim="search[type]" :placeholder="type + ' &#128269;'" style="font-size: 24px; border: 0;" class="heading"></div>
 
-            <tasks :type="type" :tasks="tasks" @change="rearrange" class="panel" group="tasks" :root="true" :search="search[type]"></tasks>
+                <tasks :type="type" :tasks="tasks" @change="rearrange" class="panel" group="tasks" :root="true" :search="search[type]"></tasks>
 
-            <hr/>
+                <hr/>
 
-            <form @submit.prevent="addTask(type)" class="d-flex flex-row align-items-center mb-3">
-                <input type="text" v-model="task" class="form-control mr-2" :placeholder="`Add ${type} task..`" aria-describedby="new task">
-                <button class="btn btn-primary" type="submit">Add</button>
-            </form>
+                <form @submit.prevent="addTask(type)" class="d-flex flex-row align-items-center mb-3">
+                    <input type="text" v-model="task" class="form-control mr-2" :placeholder="`Add ${type} task..`" aria-describedby="new task">
+                    <button class="btn btn-primary" type="submit">Add</button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    let guid = () => 'task' + Math.floor(Math.random() * 99999999999);
-    let newTask = (text, type) => ({text, priority: "medium", creation: +Math.floor(+(new Date()) / 1000), id: guid(), tasks: [], type});
+    let guid = (type) => type + Math.floor(Math.random() * 99999999999);
+    let newTask = (text, type) => ({text, priority: "medium", creation: +Math.floor(+(new Date()) / 1000), id: guid('task'), tasks: [], type});
 
     Vue.component('tasks', {
         name: 'tasks',
@@ -68,8 +97,7 @@ $tasks = json_decode(file_get_contents($kanban), TRUE);
                 this.edit(task);
             },
             duplicate(tasks, task) {
-                let copy = JSON.parse(JSON.stringify(task, (key, value) => key === 'id' ? guid() : value));
-                console.log("copy: ", copy);
+                let copy = JSON.parse(JSON.stringify(task, (key, value) => key === 'id' ? guid('task') : value));
                 tasks.push(copy);
             },
             edit(task) {
@@ -101,7 +129,7 @@ $tasks = json_decode(file_get_contents($kanban), TRUE);
     new Vue({
         el: '#app',
         data() {
-            return {search: {}, tasks: <?=json_encode($tasks['tasks'] ?: []) ?>, task: ''}
+            return {search: {}, task: '', boards: <?=json_encode($boards['boards'] ?: [])?>, activeBoardId: ''}
         },
         methods: {
             addTask(type) {
@@ -114,6 +142,18 @@ $tasks = json_decode(file_get_contents($kanban), TRUE);
                 if (ev.e.added && ev.type)
                     this.$set(ev.e.added.element, 'type', ev.type);
             },
+            createBoard() {
+                let name = prompt('New board name', 'My board');
+                if (name) this.addBoard(name);
+            },
+            addBoard(name) {
+                if (!(this.boards instanceof Array)) this.boards = [];
+                this.boards.push({id: guid('board'), name, tasks: []});
+            },
+            removeBoard(index) {
+                if (confirm('Are you sure you want to permanently delete this board?'))
+                    this.boards.splice(index, 1);
+            }
         },
         watch: {
             tasks: {
@@ -131,12 +171,32 @@ $tasks = json_decode(file_get_contents($kanban), TRUE);
                         };
 
                         filter(tasks);
-                        fetch('', {method: "POST", body: new URLSearchParams("tasks=" + JSON.stringify(tasks))})
+                        fetch('', {method: "POST", body: new URLSearchParams("boards=" + JSON.stringify(this.boards))})
                     }, 250);
                 },
             }
         },
         computed: {
+            activeBoard() {
+                if (!this.boards || !this.boards.length) this.addBoard('Main');
+                if (!this.activeBoardId) this.activeBoardId = this.boards[0].id;
+
+                for (let board of this.boards) {
+                    if (board.id === this.activeBoardId)
+                        return board;
+                }
+
+                this.activeBoardId = this.boards[0].id;
+                return this.boards[0];
+            },
+            tasks: {
+                get() {
+                    return this.activeBoard.tasks;
+                },
+                set(v) {
+                    console.log("set tasks: ", v);
+                }
+            },
             types() {
                 return ['todo', 'doing', 'done'];
             },

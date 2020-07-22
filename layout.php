@@ -21,7 +21,7 @@ register_shutdown_function(function () {
     <!doctype html>
     <html lang="en">
     <head>
-        <title><?= ucfirst(basename($title)) ?>: Todo</title>
+        <title><?= $title ?>: Todo</title>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
         <meta name="viewport" content="width=device-width,initial-scale=1.0">
         <style>
@@ -39,7 +39,7 @@ register_shutdown_function(function () {
 
             .panel {
                 margin-top: 15px;
-                height: calc(100vh - 175px);
+                height: calc(100vh - 220px);
                 overflow: auto;
             }
 
@@ -68,11 +68,14 @@ register_shutdown_function(function () {
     <body style="margin: 0; padding: 0;">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.11/vue.min.js" crossorigin="anonymous"></script>
     <script src="http://SortableJS.github.io/Sortable/Sortable.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Vue.Draggable/2.24.0/vuedraggable.umd.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/timeago.js/4.0.2/timeago.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/js/bootstrap.min.js"></script>
 
     <?= $body ?>
 

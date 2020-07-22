@@ -5,5 +5,5 @@ CWD=${1:-`pwd`}
 SELF=(`realpath $0`)
 SELF_DIR=(`dirname $SELF`)
 
-cd $CWD && nohup $SELF_DIR/todo2-web > /dev/null 2>&1 &
+cd $CWD && nohup $SELF_DIR/kanban > /dev/null 2>&1 &
 exit 0
