@@ -5,15 +5,14 @@ $dir = $_ENV['WORK_DIR'];
 $title = ucfirst(basename($dir)) ?: 'Main';
 $kanban = "$dir/.kanban";
 
-if ($boards = $_REQUEST['boards'] ?? '')
-    exit(file_put_contents($kanban, json_encode(['boards' => json_decode($boards)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)));
+if ($data = $_REQUEST['data'] ?? '')
+    exit(file_put_contents($kanban, $data));//json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)));
 
-if (!file_exists($kanban)) file_put_contents($kanban, '{"boards": []}');
-
-$boards = json_decode(file_get_contents($kanban), TRUE);
+$default = '{}';
+$data = file_exists($kanban) ? file_get_contents($kanban) ?: $default : $default;
 ?>
 
-<div id="app">
+<div id="app" v-if="activeBoard">
     <nav class="navbar navbar-expand-md navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="#">Simple Kanban</a>
@@ -29,7 +28,10 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
                             <a class="dropdown-item" href="#" v-for="(board, i) in boards" :key="board.id" @click.prevent="activeBoardId = board.id" style="min-width: 300px;">
                                 <div class="d-flex flex-row align-items-center justify-content-between">
                                     <span><i class="fa fa-fw" :class="{'fa-check': board.id === activeBoard.id}"></i> {{board.name}}</span>
-                                    <button class="btn btn-danger btn-sm" type="button" @click.prevent.stop="removeBoard(i)"><i class="fa fa-trash-o"></i></button>
+                                    <div class="btn-group">
+                                        <button class="btn btn-info btn-sm" type="button" @click.prevent.stop="renameBoard(i)" title="Rename"><i class="fa fa-edit"></i></button>
+                                        <button class="btn btn-danger btn-sm" type="button" @click.prevent.stop="removeBoard(i)" title="Remove"><i class="fa fa-trash-o"></i></button>
+                                    </div>
                                 </div>
                             </a>
                             <div class="dropdown-divider"></div>
@@ -42,7 +44,7 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
     </nav>
     <div class="container pt-3">
         <div class="row">
-            <div v-for="type in types" class="col-sm-4" :style="{opacity: type === 'completed' ? 0.65 : 1}" :key="type">
+            <div v-for="type in types" :class="`col-sm-${12/types.length}`" :style="{opacity: type === 'completed' ? 0.65 : 1}" :key="type">
                 <div><input type="search" v-model.trim="search[type]" :placeholder="type + ' &#128269;'" style="font-size: 24px; border: 0;" class="heading"></div>
 
                 <tasks :type="type" :tasks="tasks" @change="rearrange" class="panel" group="tasks" :root="true" :search="search[type]"></tasks>
@@ -50,7 +52,8 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
                 <hr/>
 
                 <form @submit.prevent="addTask(type)" class="d-flex flex-row align-items-center mb-3">
-                    <input type="text" v-model="task" class="form-control mr-2" :placeholder="`Add ${type} task..`" aria-describedby="new task">
+                    <a href="#" v-if="sel && sel.type === type" @click.prevent="sel = getParent(sel)"><i class="fa fa-level-up fa-lg mr-1"></i></a>
+                    <input type="text" v-model="task[type]" class="form-control mr-2" :placeholder="addPlaceholder[type]" aria-describedby="new task">
                     <button class="btn btn-primary" type="submit">Add</button>
                 </form>
             </div>
@@ -61,6 +64,7 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
 <script>
     let guid = (type) => type + Math.floor(Math.random() * 99999999999);
     let newTask = (text, type) => ({text, priority: "medium", creation: +Math.floor(+(new Date()) / 1000), id: guid('task'), tasks: [], type});
+    let types = ['todo', 'doing', 'done']; //add remove default boards here
 
     Vue.component('tasks', {
         name: 'tasks',
@@ -70,10 +74,10 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
                 <div v-for="(task, index) in tasks" :key="task.id" v-show="visible[task.id]" class="position-relative task" :title="timeSince(task)">
                     <div class="d-flex flex-row align-items-center list-item">
                         <a href="#" class="mr-2 text-muted" :style="{opacity: task.tasks.length ? 1: 0}" @click="$set(task, 'collapsed', !task.collapsed)">{{task.collapsed ? '&#9657;' : '&#9663;'}}</a>
-                        <input type="checkbox" class="mr-2" v-model="task.type" :true-value="type === 'todo' ? 'doing' : 'done'" :false-value="type === 'done' ? 'todo' : type"/>
-                        <div class="flex-grow-1">
+                        <input type="checkbox" class="mr-2" v-model="task.type" :true-value="type !== lastType ? nextType(type) : lastType" :false-value="type === lastType ? firstType : type"/>
+                        <div class="flex-grow-1" @click.stop="sel = !task.edit ? task : null" :class="sel === task ? 'bg-selected' : ''">
                             <div v-if="task.edit"><input type="text" v-model.lazy.trim="task.text" class="border-0  form-control form-control-sm" @keyup="e => keypress(task, e)" @blur="save(task, index)" :id="task.id+type"></div>
-                            <div v-else><a href="#" @click.prevent="edit(task)">{{task.text}}</a></div>
+                            <div v-else><a href="#" @click.prevent.stop="edit(task)">{{task.text}}</a></div>
                         </div>
                         <div class="actions pr-1">
                             <a href="#" @click.prevent="duplicate(tasks, task)" title="duplicate">&#8916;</a>
@@ -113,15 +117,32 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
             },
             timeSince(task) {
                 return timeago.format(task.creation * 1000);
+            },
+            nextType(type) {
+                return types[types.indexOf(type) + 1];
             }
         },
         computed: {
+            firstType() {
+                return types[0];
+            },
+            lastType() {
+                return types[types.length - 1];
+            },
             visible() {
                 let vis = {};
                 for (let task of this.tasks)
                     vis[task.id] = !this.root || (task.type === this.type) && (!this.search || JSON.stringify(task).indexOf(this.search) !== -1);
 
                 return vis;
+            },
+            sel: {
+                get() {
+                    return this.$root.sel;
+                },
+                set(v) {
+                    this.$set(this.$root, 'sel', v);
+                }
             }
         }
     });
@@ -129,26 +150,41 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
     new Vue({
         el: '#app',
         data() {
-            return {search: {}, task: '', boards: <?=json_encode($boards['boards'] ?: [])?>, activeBoardId: ''}
+            return {search: {}, task: {}, data: <?=$data?>, sel: null};
         },
         methods: {
             addTask(type) {
-                if (this.task !== '')
-                    this.tasks.push(newTask(this.task, type));
+                if (this.task[type] !== '') {
+                    let parent = this.sel && this.sel.type === type ? this.sel.tasks : this.tasks;
+                    parent.push(newTask(this.task[type], type));
+                }
 
-                this.task = '';
+                this.task[type] = '';
+            },
+            getParent(sel) {
+                let last = null, parent = null, ignore = JSON.stringify(this.data, (key, value) => {
+                    if (value.tasks instanceof Array && value.tasks.indexOf(sel) !== -1) parent = value;
+                    return value;
+                });
+
+                return parent;
             },
             rearrange(ev) {
                 if (ev.e.added && ev.type)
                     this.$set(ev.e.added.element, 'type', ev.type);
             },
             createBoard() {
-                let name = prompt('New board name', 'My board');
-                if (name) this.addBoard(name);
+                let name = prompt('New board name', 'My board #' + this.boards.length);
+                if (name) this.addBoard(name, true);
             },
-            addBoard(name) {
-                if (!(this.boards instanceof Array)) this.boards = [];
-                this.boards.push({id: guid('board'), name, tasks: []});
+            addBoard(name, switchTo = false) {
+                let id = guid('board');
+                this.data.boards.push({id, name, tasks: []});
+                if (switchTo === true) this.activeBoardId = id;
+            },
+            renameBoard(index) {
+                let name = prompt('Rename board to:', this.boards[index].name);
+                if (name) this.boards[index].name = name;
             },
             removeBoard(index) {
                 if (confirm('Are you sure you want to permanently delete this board?'))
@@ -156,10 +192,10 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
             }
         },
         watch: {
-            tasks: {
+            boards: {
                 deep: true,
                 immediate: true,
-                handler(tasks) {
+                handler(boards) {
                     clearTimeout(this.timeout);
                     this.timeout = setTimeout(() => {
                         let seen = {}, filter = items => {
@@ -170,17 +206,36 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
                             }
                         };
 
-                        filter(tasks);
-                        fetch('', {method: "POST", body: new URLSearchParams("boards=" + JSON.stringify(this.boards))})
+                        filter(this.activeBoard.tasks);
+                        fetch('', {method: "POST", body: new URLSearchParams("data=" + JSON.stringify(this.data))})
                     }, 250);
                 },
             }
         },
         computed: {
-            activeBoard() {
-                if (!this.boards || !this.boards.length) this.addBoard('<?=$title?>');
-                if (!this.activeBoardId) this.activeBoardId = this.boards[0].id;
+            addPlaceholder() {
+                let placeholders = {};
 
+                for (let type of this.types)
+                    placeholders[type] = this.sel && this.sel.type === type ? `Add child to ${this.sel.text.substr(0, 10)}` : `Add ${type} task..`;
+
+                return placeholders;
+            },
+            boards() {
+                if (!this.data || !(this.data.boards instanceof Array)) this.data.boards = [];
+                if (!this.data.boards.length) this.addBoard('Main board', true);
+
+                return this.data.boards;
+            },
+            activeBoardId: {
+                get() {
+                    return this.data.activeBoardId || this.boards[0].id;
+                },
+                set(v) {
+                    this.$set(this.data, 'activeBoardId', v);
+                }
+            },
+            activeBoard() {
                 for (let board of this.boards) {
                     if (board.id === this.activeBoardId)
                         return board;
@@ -189,16 +244,11 @@ $boards = json_decode(file_get_contents($kanban), TRUE);
                 this.activeBoardId = this.boards[0].id;
                 return this.boards[0];
             },
-            tasks: {
-                get() {
-                    return this.activeBoard.tasks;
-                },
-                set(v) {
-                    console.log("set tasks: ", v);
-                }
+            tasks() {
+                return this.activeBoard.tasks;
             },
             types() {
-                return ['todo', 'doing', 'done'];
+                return types;
             },
         }
     });

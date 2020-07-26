@@ -62,6 +62,10 @@ register_shutdown_function(function () {
             .task .list-item:hover .actions a {
                 display: inline-block;
             }
+
+            .bg-selected {
+                background: #ecffec;
+            }
         </style>
     </head>
 
