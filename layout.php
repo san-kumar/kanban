@@ -43,6 +43,23 @@ register_shutdown_function(function () {
                 overflow: auto;
             }
 
+            .panel.doing.one-item-only a {
+                color: red;
+                font-weight: bold;
+                font-size: 24px;
+                animation: blinker 5s linear infinite;
+            }
+
+            @keyframes blinker {
+                50% {
+                    opacity: 1;
+                }
+
+                75% {
+                    opacity: 0;
+                }
+            }
+
             .task .actions {
                 text-wrap: none;
                 white-space: nowrap;
@@ -79,7 +96,7 @@ register_shutdown_function(function () {
     <script src="http://SortableJS.github.io/Sortable/Sortable.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Vue.Draggable/2.24.0/vuedraggable.umd.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/timeago.js/4.0.2/timeago.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/js/bootstrap.bundle.min.js"></script>
 
     <?= $body ?>
 

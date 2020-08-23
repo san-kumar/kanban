@@ -5,8 +5,10 @@ $dir = $_ENV['WORK_DIR'];
 $title = ucfirst(basename($dir)) ?: 'Main';
 $kanban = "$dir/.kanban";
 
-if ($data = $_REQUEST['data'] ?? '')
+if ($data = $_REQUEST['data'] ?? '') {
+    copy($kanban, "/tmp/.kanban-"  .dirname($dir). '-'. time() . ".bak");
     exit(file_put_contents($kanban, $data));//json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)));
+}
 
 $default = '{}';
 $data = file_exists($kanban) ? file_get_contents($kanban) ?: $default : $default;
@@ -38,6 +40,7 @@ $data = file_exists($kanban) ? file_get_contents($kanban) ?: $default : $default
                             <a class="dropdown-item font-weight-bold text-success" href="#" @click.prevent="createBoard()"><i class="fa fa-plus-circle"></i> Create new kanban board</a>
                         </div>
                     </li>
+                    <li class="nav-item" title="Settings"><a class="nav-link" href="#" @click.prevent="showSettings()"><i class="fa fa-cog"></i></a></li>
                 </ul>
             </div>
         </div>
@@ -47,7 +50,9 @@ $data = file_exists($kanban) ? file_get_contents($kanban) ?: $default : $default
             <div v-for="type in types" :class="`col-sm-${12/types.length}`" :style="{opacity: type === 'completed' ? 0.65 : 1}" :key="type">
                 <div><input type="search" v-model.trim="search[type]" :placeholder="type + ' &#128269;'" style="font-size: 24px; border: 0;" class="heading"></div>
 
-                <tasks :type="type" :tasks="tasks" @change="rearrange" class="panel" group="tasks" :root="true" :search="search[type]"></tasks>
+                <div @click="sel=null">
+                    <tasks :type="type" :tasks="tasks" @change="rearrange" class="panel" :class="[type, settings.oneDoingItem ? 'one-item-only' : '']" group="tasks" :root="true" :search="search[type]"></tasks>
+                </div>
 
                 <hr/>
 
@@ -56,6 +61,23 @@ $data = file_exists($kanban) ? file_get_contents($kanban) ?: $default : $default
                     <input type="text" v-model="task[type]" class="form-control mr-2" :placeholder="addPlaceholder[type]" aria-describedby="new task">
                     <button class="btn btn-primary" type="submit">Add</button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" ref="settingsModal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <h3>Kanban settings</h3>
+
+                    <label class="checkbox-inline">
+                        <input type="checkbox" v-model="settings.oneDoingItem"> Only one <i>Doing</i> item
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" data-dismiss="modal" class="btn btn-primary">Save</button>
+                </div>
             </div>
         </div>
     </div>
@@ -74,8 +96,8 @@ $data = file_exists($kanban) ? file_get_contents($kanban) ?: $default : $default
                 <div v-for="(task, index) in tasks" :key="task.id" v-show="visible[task.id]" class="position-relative task" :title="timeSince(task)">
                     <div class="d-flex flex-row align-items-center list-item">
                         <a href="#" class="mr-2 text-muted" :style="{opacity: task.tasks.length ? 1: 0}" @click="$set(task, 'collapsed', !task.collapsed)">{{task.collapsed ? '&#9657;' : '&#9663;'}}</a>
-                        <input type="checkbox" class="mr-2" v-model="task.type" :true-value="type !== lastType ? nextType(type) : lastType" :false-value="type === lastType ? firstType : type"/>
-                        <div class="flex-grow-1" @click.stop="sel = !task.edit ? task : null" :class="sel === task ? 'bg-selected' : ''">
+                        <input type="checkbox" class="mr-2" v-model="task.type" :true-value="type !== lastType ? nextType(type) : lastType" :false-value="type === lastType ? firstType : type" @input="$set(task, 'updated', +new Date())" />
+                        <div class="flex-grow-1" @click.stop="sel = !task.edit && sel !== task ? task : null" :class="sel === task ? 'bg-selected' : ''">
                             <div v-if="task.edit"><input type="text" v-model.lazy.trim="task.text" class="border-0  form-control form-control-sm" @keyup="e => keypress(task, e)" @blur="save(task, index)" :id="task.id+type"></div>
                             <div v-else><a href="#" @click.prevent.stop="edit(task)">{{task.text}}</a></div>
                         </div>
@@ -189,22 +211,29 @@ $data = file_exists($kanban) ? file_get_contents($kanban) ?: $default : $default
             removeBoard(index) {
                 if (confirm('Are you sure you want to permanently delete this board?'))
                     this.boards.splice(index, 1);
+            },
+            showSettings() {
+                $(this.$refs.settingsModal).modal('show');
             }
         },
         watch: {
-            boards: {
+            data: {
                 deep: true,
                 immediate: true,
-                handler(boards) {
+                handler() {
                     clearTimeout(this.timeout);
                     this.timeout = setTimeout(() => {
-                        let seen = {}, filter = items => {
+                        let seen = {}, doing = '', filter = items => { //TODO this hack must be removed
                             for (let i = items.length - 1; i >= 0; i--) {
                                 let item = items[i], id = item.id;
-                                if (seen[id]) items.splice(i, 1); else seen[id] = true;
+                                if (seen[id]) items[i].id = guid('task'); else seen[id] = true;
                                 if (item.tasks instanceof Array) filter(item.tasks);
                             }
                         };
+
+                        for (let item of this.activeBoard.tasks)
+                            if (item.type === 'doing' && this.settings.oneDoingItem)
+                                if (!doing) doing = item.id; else this.$set(item, 'type', 'todo');
 
                         filter(this.activeBoard.tasks);
                         fetch('', {method: "POST", body: new URLSearchParams("data=" + JSON.stringify(this.data))})
@@ -250,6 +279,16 @@ $data = file_exists($kanban) ? file_get_contents($kanban) ?: $default : $default
             types() {
                 return types;
             },
+            settings: {
+                get() {
+                    if (!this.data) return {};
+                    if (this.data && !this.data.settings) this.$set(this.data, 'settings', {});
+                    return this.data.settings;
+                },
+                set(v) {
+                    this.$set(this.data, 'settings', v);
+                }
+            }
         }
     });
 </script>
